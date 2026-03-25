@@ -2,7 +2,7 @@
 // @name         NodeSeek Admin Plus
 // @name:zh-CN   NodeSeek 管理预设增强
 // @namespace    https://github.com/hkfires/NodeSeekAdminPlus
-// @version      0.1.1
+// @version      0.1.2
 // @description  Exclusive enhancement tool for NodeSeek administrators.
 // @description:zh-CN  NodeSeek 管理员专属增强工具，提供后台预设及管理功能优化（仅限管理员使用）。
 // @author       hKFirEs
@@ -93,6 +93,10 @@
         .ns-btn-primary:hover { background:#4cae4c; }
         .ns-btn-secondary { background:#6c757d;color:#fff;border:none;border-radius:4px;padding:6px 16px;cursor:pointer;font-size:13px; }
         .ns-btn-secondary:hover { background:#5a6268; }
+        .ns-btn-export { background:#17a2b8;color:#fff; }
+        .ns-btn-export:hover { background:#138496; }
+        .ns-btn-import { background:#17a2b8;color:#fff; }
+        .ns-btn-import:hover { background:#138496; }
         .ns-btn-add-preset { background:#337ab7;color:#fff;border:none;border-radius:4px;padding:6px 14px;cursor:pointer;font-size:13px;margin-bottom:10px; }
         .ns-btn-add-preset:hover { background:#286090; }
         .ns-btn-cancel-edit { background:#f0ad4e;color:#fff;border:none;border-radius:4px;padding:6px 16px;cursor:pointer;font-size:13px;margin-left:8px; }
@@ -402,6 +406,8 @@
             + '</div>'
             + '</div>'
             + '<div class="ns-modal-footer">'
+            + '<button class="ns-btn-secondary ns-btn-export" id="ns-preset-export">导出预设</button>'
+            + '<button class="ns-btn-secondary ns-btn-import" id="ns-preset-import">导入预设</button>'
             + '<button class="ns-btn-primary" id="ns-preset-save-all">保存并关闭</button>'
             + '<button class="ns-btn-secondary" id="ns-preset-reset">恢复默认</button>'
             + '<button class="ns-btn-secondary" id="ns-preset-cancel">取消</button>'
@@ -532,6 +538,133 @@
             return preset;
         }
 
+        // =============================================
+        // 导入 / 导出
+        // =============================================
+        function buildExportText() {
+            const all = loadCustomPresets();
+            const defaultKeys = new Set((DEFAULT_CUSTOM_PRESETS || []).map(p => p.key));
+            // 仅导出自定义预设（排除默认三条）
+            const presets = all.filter(p => !defaultKeys.has(p.key));
+            const payload = {
+                schema: 'NodeSeekAdminPlusPresets',
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                presets
+            };
+            return JSON.stringify(payload, null, 2);
+        }
+
+        function downloadTextFile(filename, text) {
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            // 稍后释放，避免某些浏览器下载失败
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function sanitizePreset(p, indexForKey) {
+            if (!p || typeof p !== 'object') return null;
+            const name = typeof p.name === 'string' ? p.name.trim() : '';
+            if (!name) return null;
+
+            const out = {};
+            out.key = (typeof p.key === 'string' && p.key.trim()) ? p.key.trim() : ('import_' + Date.now() + '_' + indexForKey);
+            out.name = name;
+            out.reason = (typeof p.reason === 'string' && p.reason.trim()) ? p.reason.trim() : name;
+            out.coin_diff = Number.isFinite(Number(p.coin_diff)) ? parseInt(p.coin_diff, 10) : 0;
+            out.stardust_diff = Number.isFinite(Number(p.stardust_diff)) ? parseInt(p.stardust_diff, 10) : 0;
+
+            const allowedOps = new Set(Object.keys(OP_LABELS));
+            let ops = Array.isArray(p.operations) ? p.operations.slice() : buildOpsFromPreset(out);
+            ops = ops.filter(op => typeof op === 'string' && allowedOps.has(op));
+
+            // 确保 coin/stardust 与 diff 一致
+            if (out.coin_diff !== 0 && !ops.includes('coin')) ops.unshift('coin');
+            if (out.coin_diff === 0) ops = ops.filter(op => op !== 'coin');
+            if (out.stardust_diff !== 0 && !ops.includes('stardust')) ops.unshift('stardust');
+            if (out.stardust_diff === 0) ops = ops.filter(op => op !== 'stardust');
+
+            // 去重
+            out.operations = Array.from(new Set(ops));
+            if (out.operations.length === 0) out.operations = ['coin'];
+
+            // 可选参数：按需带上（字符串/数字即可）
+            if (p.suspend_value !== undefined) out.suspend_value = String(p.suspend_value);
+            if (p.suspend_days !== undefined) out.suspend_days = parseInt(p.suspend_days, 10) || 1;
+            if (p.lock_value !== undefined) out.lock_value = String(p.lock_value);
+            if (p.award_value !== undefined) out.award_value = String(p.award_value);
+            if (p.hide_value !== undefined) out.hide_value = String(p.hide_value);
+            if (p.rank_value !== undefined) out.rank_value = String(p.rank_value);
+            if (p.category_value !== undefined) out.category_value = String(p.category_value);
+            if (p.new_title !== undefined) out.new_title = String(p.new_title);
+
+            return out;
+        }
+
+        function extractImportedPresets(parsed) {
+            if (Array.isArray(parsed)) return parsed;
+            if (parsed && typeof parsed === 'object' && Array.isArray(parsed.presets)) return parsed.presets;
+            return null;
+        }
+
+        function makeUniqueKey(desiredKey, usedKeys) {
+            let key = desiredKey;
+            if (!key) key = 'import_' + Date.now();
+            if (!usedKeys.has(key)) return key;
+            let i = 1;
+            while (usedKeys.has(key + '_' + i)) i++;
+            return key + '_' + i;
+        }
+
+        // 导入将“强制覆盖自定义预设部分”，默认三条始终保留
+        function importPresetsFromText(text) {
+            if (!text || !String(text).trim()) return;
+            let parsed;
+            try {
+                parsed = JSON.parse(text);
+            } catch (e) {
+                alert('导入失败：JSON 格式不正确');
+                return;
+            }
+
+            const rawList = extractImportedPresets(parsed);
+            if (!rawList) {
+                alert('导入失败：未找到 presets 数组（支持直接数组或 { presets: [...] }）');
+                return;
+            }
+
+            const sanitized = [];
+            rawList.forEach((p, idx) => {
+                const s = sanitizePreset(p, idx);
+                if (s) sanitized.push(s);
+            });
+
+            if (sanitized.length === 0) {
+                alert('导入失败：没有可用的预设数据');
+                return;
+            }
+
+            const defaults = JSON.parse(JSON.stringify(DEFAULT_CUSTOM_PRESETS || []));
+            const usedKeys = new Set(defaults.map(p => p.key));
+            sanitized.forEach((p, idx) => {
+                p.key = makeUniqueKey(p.key || ('import_' + Date.now() + '_' + idx), usedKeys);
+                usedKeys.add(p.key);
+            });
+
+            // 强制覆盖：仅替换自定义部分
+            saveCustomPresets(defaults.concat(sanitized));
+            resetFormToAddMode();
+            modal.querySelector('#ns-add-preset-form').style.display = 'none';
+            renderPresetList(modal, fillFormForEdit);
+            alert('导入成功：' + sanitized.length + ' 条预设');
+        }
+
         renderPresetList(modal, fillFormForEdit);
 
         // 新增/编辑切换按钮
@@ -574,6 +707,45 @@
             resetFormToAddMode();
             modal.querySelector('#ns-add-preset-form').style.display = 'none';
             renderPresetList(modal, fillFormForEdit);
+        });
+
+        // 导出
+        modal.querySelector('#ns-preset-export').addEventListener('click', () => {
+            const text = buildExportText();
+            const ts = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            const filename = 'NodeSeekAdminPlus-presets-' + ts.getFullYear()
+                + pad(ts.getMonth() + 1) + pad(ts.getDate()) + '-'
+                + pad(ts.getHours()) + pad(ts.getMinutes()) + pad(ts.getSeconds()) + '.json';
+            downloadTextFile(filename, text);
+        });
+
+        // 导入
+        modal.querySelector('#ns-preset-import').addEventListener('click', () => {
+            // 使用文件选择导入（txt 内为 JSON）
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json,application/json,text/plain';
+            input.style.display = 'none';
+            document.body.appendChild(input);
+            input.addEventListener('change', () => {
+                const file = input.files && input.files[0];
+                if (!file) { input.remove(); return; }
+                const reader = new FileReader();
+                reader.onload = () => {
+                    try {
+                        importPresetsFromText(String(reader.result || ''));
+                    } finally {
+                        input.remove();
+                    }
+                };
+                reader.onerror = () => {
+                    alert('导入失败：读取文件失败');
+                    input.remove();
+                };
+                reader.readAsText(file, 'utf-8');
+            }, { once: true });
+            input.click();
         });
 
         modal.querySelector('#ns-preset-save-all').addEventListener('click', () => { overlay.remove(); rebuildSelectOptions(selectEl, loadCustomPresets()); });

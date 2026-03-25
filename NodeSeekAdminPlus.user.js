@@ -2,7 +2,7 @@
 // @name         NodeSeek Admin Plus
 // @name:zh-CN   NodeSeek 管理预设增强
 // @namespace    https://github.com/hkfires/NodeSeekAdminPlus
-// @version      0.1.0
+// @version      0.1.1
 // @description  Exclusive enhancement tool for NodeSeek administrators.
 // @description:zh-CN  NodeSeek 管理员专属增强工具，提供后台预设及管理功能优化（仅限管理员使用）。
 // @author       hKFirEs
@@ -203,19 +203,37 @@
         const opSelect = addOpRow.querySelector('select');
         const addOpBtn = addOpRow.querySelector('button.add-operation');
         if (!opSelect || !addOpBtn) { alert('无法找到"添加操作"按钮，请刷新重试'); return; }
-        ops.forEach((opKey, idx) => {
-            const optionExists = Array.from(opSelect.options).some(o => o.value === opKey);
-            if (!optionExists) return;
-            opSelect.value = opKey;
-            opSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            addOpBtn.click();
-            setTimeout(() => fillOpParams(adminPanel, opKey, preset), 130 * (idx + 1));
+
+        // 清空现有操作行：点击 .title 里的 svg.iconpark-icon（Vue 关闭按钮）
+        const existingItems = Array.from(adminPanel.querySelectorAll('.opt-item'));
+        existingItems.reverse().forEach(item => {
+            const closeBtn = item.querySelector('.title svg.iconpark-icon');
+            if (closeBtn) {
+                closeBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            } else {
+                item.remove();
+            }
         });
-        const lbl = section.querySelector('.ns-custom-preset-label');
-        const orig = '自定义预设：';
-        lbl.textContent = '\u2705 已应用「' + preset.name + '」';
-        lbl.style.color = '#5cb85c';
-        setTimeout(() => { lbl.textContent = orig; lbl.style.color = ''; }, 2000);
+
+        // 等待 DOM 清空稳定后再添加新操作（若有删除动作则多等一会）
+        const clearDelay = existingItems.length > 0 ? 130 : 0;
+        setTimeout(() => {
+            // 重新查询，防止面板重渲染后引用失效
+            const freshAddOpRow = findAddOpRow(adminPanel);
+            if (!freshAddOpRow) return;
+            const freshOpSelect = freshAddOpRow.querySelector('select');
+            const freshAddOpBtn = freshAddOpRow.querySelector('button.add-operation');
+            if (!freshOpSelect || !freshAddOpBtn) return;
+
+            ops.forEach((opKey, idx) => {
+                const optionExists = Array.from(freshOpSelect.options).some(o => o.value === opKey);
+                if (!optionExists) return;
+                freshOpSelect.value = opKey;
+                freshOpSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                freshAddOpBtn.click();
+                setTimeout(() => fillOpParams(adminPanel, opKey, preset), 130 * (idx + 1));
+            });
+        }, clearDelay);
     }
 
     function findAddOpRow(adminPanel) {
@@ -361,8 +379,7 @@
             + '<input type="hidden" id="ns-edit-index" value="-1" />'
             + '<div class="ns-form-row"><label>预设名称</label><input type="text" id="ns-new-name" placeholder="如：广告处理" /></div>'
             + '<div class="ns-form-row"><label>理由</label><input type="text" id="ns-new-reason" placeholder="自动填入鸡腿操作的理由" /></div>'
-            + '<div class="ns-form-row"><label>鸡腿变化</label><input type="number" id="ns-new-coin" placeholder="正数加，负数减，0不操作" value="0" /></div>'
-            + '<div class="ns-form-row"><label>星辰变化</label><input type="number" id="ns-new-stardust" placeholder="正数加，负数减，0不操作" value="0" /></div>'
+            + '<div class="ns-form-row"><label>鸡腿变化</label><input type="number" id="ns-new-coin" placeholder="正数加，负数减，0不操作" value="0" style="margin-right:8px;" /><label style="width:auto;margin-right:4px;">星辰变化</label><input type="number" id="ns-new-stardust" placeholder="正数加，负数减，0不操作" value="0" /></div>'
             + '<div class="ns-form-row"><label>额外操作</label><div class="ns-op-checkboxes" id="ns-new-ops">'
             + '<label><input type="checkbox" value="suspend"> 禁止发言</label>'
             + '<label><input type="checkbox" value="lockDiscussion"> 锁定帖子</label>'

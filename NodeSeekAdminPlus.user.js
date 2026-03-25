@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         NodeSeek Admin Plus
-// @name:zh-CN   NodeSeek 管理员增强插件
+// @name:zh-CN   NodeSeek 管理预设增强
 // @namespace    https://github.com/hkfires/NodeSeekAdminPlus
 // @version      0.1.0
 // @description  Exclusive enhancement tool for NodeSeek administrators.

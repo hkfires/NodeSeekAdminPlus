@@ -2,7 +2,7 @@
 // @name         NodeSeek Admin Plus
 // @name:zh-CN   NodeSeek 管理预设增强
 // @namespace    https://github.com/hkfires/NodeSeekAdminPlus
-// @version      0.1.2
+// @version      0.1.3
 // @description  Exclusive enhancement tool for NodeSeek administrators.
 // @description:zh-CN  NodeSeek 管理员专属增强工具，提供后台预设及管理功能优化（仅限管理员使用）。
 // @author       hKFirEs
@@ -101,6 +101,33 @@
         .ns-btn-add-preset:hover { background:#286090; }
         .ns-btn-cancel-edit { background:#f0ad4e;color:#fff;border:none;border-radius:4px;padding:6px 16px;cursor:pointer;font-size:13px;margin-left:8px; }
         .ns-btn-cancel-edit:hover { background:#ec971f; }
+
+        /* ========== 移动端适配 ========== */
+        @media screen and (max-width: 640px) {
+            .ns-custom-preset-section { flex-wrap:wrap;gap:6px; }
+            .ns-custom-preset-label { width:100%;font-size:12px; }
+            .ns-custom-preset-select { flex:1 1 0;min-width:0;font-size:12px; }
+            .ns-custom-preset-btn { padding:0 8px;font-size:12px;height:28px; }
+            .ns-preset-manager-modal { width:100vw;max-width:100vw;max-height:90vh;border-radius:12px 12px 0 0;padding:14px;margin:0;align-self:flex-end; }
+            .ns-preset-manager-modal h3 { font-size:15px;margin-bottom:10px; }
+            .ns-form-row { flex-direction:column;align-items:stretch;gap:4px; }
+            .ns-form-row label { width:100%;font-size:12px; }
+            .ns-form-row input[type="text"],.ns-form-row input[type="number"] { width:100%;font-size:14px;height:34px; }
+            .ns-form-row select.ns-form-select { width:100%;font-size:14px;height:34px; }
+            .ns-form-row .ns-op-checkboxes { display:grid;grid-template-columns:1fr 1fr;gap:6px 12px; }
+            .ns-form-row .ns-op-checkboxes label { font-size:13px; }
+            .ns-preset-item { padding:8px; }
+            .ns-preset-item-header { flex-direction:column;align-items:flex-start;gap:6px; }
+            .ns-preset-item-name { font-size:13px; }
+            .ns-preset-item-badges { width:100%; }
+            .ns-badge { font-size:10px;padding:2px 5px; }
+            .ns-preset-item-header .ns-preset-item-edit,.ns-preset-item-header .ns-preset-item-del { font-size:12px;padding:4px 10px;height:26px; }
+            .ns-modal-footer { flex-wrap:wrap;justify-content:center;gap:6px; }
+            .ns-modal-footer button { flex:1 1 calc(50% - 6px);min-width:0;font-size:12px;padding:8px 0;text-align:center; }
+            .ns-btn-add-preset { width:100%;text-align:center;font-size:13px; }
+            .ns-preset-add-form .ns-form-row:last-child { flex-direction:row;justify-content:stretch;gap:8px; }
+            .ns-preset-add-form .ns-form-row:last-child button { flex:1;text-align:center; }
+        }
     `);
 
     const OP_LABELS = {
